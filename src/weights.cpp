@@ -34,7 +34,7 @@ void load_weights(std::shared_ptr<GPT2> model, const std::string& path, torch::D
     model->wte->weight.copy_(get("wte.weight"));
     model->wpe->weight.copy_(get("wpe.weight"));
 
-    for (int i = 0; i < 12; ++i) {
+    for (int64_t i = 0; i < model->n_layers; ++i) {
         std::string p = "h." + std::to_string(i) + ".";
         auto b = (*model->blocks)[i]->as<TransformerBlock>();
 

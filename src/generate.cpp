@@ -14,19 +14,24 @@ std::vector<int64_t> generate(
     const std::vector<int64_t>& banned)
 {
     torch::Device device = input_tokens.device();
-    torch::Tensor tokens = input_tokens.clone();
     std::vector<int64_t> out;
 
     torch::NoGradGuard no_grad;
     float temp = std::max(temperature, 1e-5f);
+    int64_t max_len = model->max_len;
+
+    // 每层一个 KV 缓存，生成过程中复用历史 K/V，只算新 token
+    std::vector<KVCache> caches(model->n_layers);
+
+    // 预填充：先把整段 prompt 送进去（超过 max_len 只保留最后 max_len 个）
+    int64_t seq = input_tokens.size(1);
+    torch::Tensor next = seq > max_len ? input_tokens.slice(1, seq - max_len, seq) : input_tokens;
 
     for (int step = 0; step < max_new_tokens; ++step) {
-        // GPT-2 最多 1024 个位置，超长只保留最后 1024 个
-        int64_t seq = tokens.size(1);
-        auto input = seq > 1024 ? tokens.slice(1, seq - 1024, seq) : tokens;
+        if (caches[0].len() >= max_len) break;   // 达到 GPT-2 位置编码上限
 
-        // 取最后一个 token 的 logits，并做温度缩放
-        auto logits = model->forward(input)[0][-1] / temp;
+        // 增量前向：第一轮算整段 prompt，之后每轮只算 1 个新 token
+        auto logits = model->forward(next, caches)[0][-1] / temp;
 
         // Top-K 过滤：只保留概率最高的 K 个候选
         if (top_k > 0) {
@@ -41,15 +46,15 @@ std::vector<int64_t> generate(
             logits = logits.index_fill(0, torch::tensor(banned, torch::kLong).to(device),
                                        -std::numeric_limits<float>::infinity());
 
-        int64_t next;
+        int64_t tok;
         if (temperature <= 1e-5)
-            next = logits.argmax().item<int64_t>();                          // 贪心
+            tok = logits.argmax().item<int64_t>();                          // 贪心
         else
-            next = torch::multinomial(torch::softmax(logits, -1), 1).item<int64_t>();
+            tok = torch::multinomial(torch::softmax(logits, -1), 1).item<int64_t>();
 
-        if (next == eos_id) break;
-        out.push_back(next);
-        tokens = torch::cat({tokens, torch::tensor({{next}}, torch::kLong).to(device)}, 1);
+        if (tok == eos_id) break;
+        out.push_back(tok);
+        next = torch::tensor({{tok}}, torch::kLong).to(device);   // 下一轮只算这 1 个 token
     }
     return out;
 }

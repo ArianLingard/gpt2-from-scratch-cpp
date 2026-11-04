@@ -7,7 +7,7 @@
 - **模型结构**：`MultiHeadAttention`（缩放点积 + 因果掩码）、`FeedForward`、`TransformerBlock`（Pre-LayerNorm + 残差）、`GPT2`
 - **权重加载**：从 HuggingFace 的 `model.safetensors` 读取权重，并把 `c_attn`（Q/K/V 拼合矩阵）按 1/3 拆回三份
 - **BPE 编码/解码**：完整实现 GPT-2 的字节级 BPE —— 预分词（复刻 GPT-2 正则）、字节↔Unicode 映射、`merges.txt` 合并、`vocab.json` 查表
-- **文本生成**：贪心、温度采样 + Top-K 三种策略，可屏蔽指定 token（如换行符）
+- **文本生成**：基于 KV Cache 的自回归生成，支持贪心、温度采样 + Top-K 三种策略，可屏蔽指定 token（如换行符）
 - **用户输入提示词**：支持命令行参数或标准输入
 
 ## 目录结构
@@ -107,6 +107,7 @@ Hello, I am so glad that I found you. ...
 
 ## 实现要点
 
+- **KV Cache**：生成时缓存每层注意力算出的 K/V，每个新 token 只做一次增量前向（`forward(x, caches)`），避免每步重复计算整段历史
 - **权重共享**：`lm_head->weight` 与 `wte->weight` 指向同一张权重
 - **c_attn 拆分**：HF 把 Q/K/V 拼成一个 `[3*d, d]` 矩阵，加载时按列切成三份并转置
 - **字节级 BPE**：每个 UTF-8 字节先映射成一个 Unicode 字符（不可打印字节映射到 `256+` 的码点，如空格 `Ġ`），再做 BPE 合并；编码与解码共用同一套 `unicode_to_byte` 映射

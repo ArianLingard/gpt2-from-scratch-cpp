@@ -1,0 +1,53 @@
+# ===== 构建产物 =====
+build/
+cmake-build-*/
+out/
+
+# ===== CMake 生成文件 =====
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+CMakeUserPresets.json
+compile_commands.json
+Makefile
+*.ninja
+.ninja_deps
+.ninja_log
+
+# ===== 编译中间文件 / 二进制 =====
+*.o
+*.obj
+*.exe
+*.dll
+*.lib
+*.dylib
+*.so
+*.a
+*.exp
+*.pdb
+*.ilk
+*.tlog
+*.recipe
+
+# ===== Visual Studio =====
+.vs/
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.sln
+*.slnx
+*.suo
+*.user
+
+# ===== 模型权重 / 词表（体积大，需从 HuggingFace 另行下载）=====
+checkpoint/
+
+# ===== 编辑器 / IDE =====
+.vscode/
+.idea/
+*.swp
+*~
+
+# ===== 个人笔记 =====
+quicknotes.txt
